@@ -28,7 +28,7 @@ describe('TasksService', () => {
     const input = {
       title: 'Write tests',
       description: 'Cover task endpoints',
-      responsible: 'Alex',
+      responsible: 'Manuel',
       dueDate: '2026-12-01',
     };
 
@@ -45,7 +45,7 @@ describe('TasksService', () => {
     vi.mocked(repository.findAndCount).mockResolvedValue([[], 23]);
     const query: ListTasksQueryDto = {
       status: TaskStatus.IN_PROGRESS,
-      responsible: 'Alex',
+      responsible: 'Manuel',
       page: 2,
       limit: 10,
     };
@@ -53,7 +53,7 @@ describe('TasksService', () => {
     const result = await service.findAll(query);
 
     expect(repository.findAndCount).toHaveBeenCalledWith({
-      where: { status: TaskStatus.IN_PROGRESS, responsible: 'Alex' },
+      where: { status: TaskStatus.IN_PROGRESS, responsible: 'Manuel' },
       order: { createdAt: 'DESC', id: 'DESC' },
       skip: 10,
       take: 10,

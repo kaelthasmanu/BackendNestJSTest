@@ -36,7 +36,7 @@ describe('Tasks API (e2e)', () => {
       .send({
         title: 'Prepare release',
         description: 'Run the release checklist',
-        responsible: 'Alex',
+        responsible: 'Manuel',
         dueDate: '2026-12-01',
       })
       .expect(201);
@@ -51,7 +51,7 @@ describe('Tasks API (e2e)', () => {
       .send({
         title: '',
         description: 'Invalid task',
-        responsible: 'Alex',
+        responsible: 'Manuel',
         dueDate: '2026-02-30',
       })
       .expect(400);
@@ -60,8 +60,8 @@ describe('Tasks API (e2e)', () => {
   it('lists tasks with filters and pagination metadata', async () => {
     await request(app.getHttpServer()).post('/tasks').send({
       title: 'First task',
-      description: 'For Alex',
-      responsible: 'Alex',
+      description: 'For Manuel',
+      responsible: 'Manuel',
       dueDate: '2026-12-01',
       status: 'en curso',
     });
@@ -73,11 +73,11 @@ describe('Tasks API (e2e)', () => {
     });
 
     const response = await request(app.getHttpServer())
-      .get('/tasks?status=en%20curso&responsible=Alex&page=1&limit=1')
+      .get('/tasks?status=en%20curso&responsible=Manuel&page=1&limit=1')
       .expect(200);
 
     expect(response.body.data).toHaveLength(1);
-    expect(response.body.data[0].responsible).toBe('Alex');
+    expect(response.body.data[0].responsible).toBe('Manuel');
     expect(response.body.meta).toEqual({
       page: 1,
       limit: 1,
@@ -95,7 +95,7 @@ describe('Tasks API (e2e)', () => {
         .send({
           title: `Task ${index}`,
           description: `Description ${index}`,
-          responsible: index % 2 === 0 ? 'Alex' : 'Sam',
+          responsible: index % 2 === 0 ? 'Manuel' : 'Sam',
           dueDate: '2026-12-01',
           status: index % 3 === 0 ? 'pendiente' : 'en curso',
         })
@@ -197,7 +197,7 @@ describe('Tasks API (e2e)', () => {
       .send({
         title: 'Update this task',
         description: 'Verify PATCH and DELETE',
-        responsible: 'Alex',
+        responsible: 'Manuel',
         dueDate: '2026-12-01',
       })
       .expect(201);
@@ -223,7 +223,7 @@ describe('Tasks API (e2e)', () => {
       .send({
         title: '  Original title  ',
         description: '  Original description  ',
-        responsible: '  Alex  ',
+        responsible: '  Manuel  ',
         dueDate: '2026-12-01',
       })
       .expect(201);
@@ -231,7 +231,7 @@ describe('Tasks API (e2e)', () => {
     expect(created.body).toMatchObject({
       title: 'Original title',
       description: 'Original description',
-      responsible: 'Alex',
+      responsible: 'Manuel',
       status: 'pendiente',
     });
 
@@ -258,7 +258,7 @@ describe('Tasks API (e2e)', () => {
     expect(unchanged.body).toMatchObject({
       title: 'Original title',
       description: 'Original description',
-      responsible: 'Alex',
+      responsible: 'Manuel',
       dueDate: '2026-12-01',
       status: 'pendiente',
       createdAt: created.body.createdAt,
@@ -271,7 +271,7 @@ describe('Tasks API (e2e)', () => {
     expect(updated.body).toMatchObject({
       title: 'Updated title',
       description: 'Original description',
-      responsible: 'Alex',
+      responsible: 'Manuel',
       dueDate: '2026-12-01',
       status: 'pendiente',
       createdAt: created.body.createdAt,
