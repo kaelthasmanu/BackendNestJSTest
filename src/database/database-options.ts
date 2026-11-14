@@ -45,7 +45,7 @@ export function createDatabaseOptions(): DataSourceOptions {
 
   return {
     ...commonOptions,
-    type: 'sqlite',
+    type: 'better-sqlite3',
     database:
       process.env.NODE_ENV === 'test'
         ? ':memory:'
