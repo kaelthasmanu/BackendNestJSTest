@@ -1,0 +1,46 @@
+services:
+  api:
+    build:
+      context: .
+      target: production
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-tasks}
+      DB_USER: ${DB_USER:-tasks}
+      DB_PASSWORD: ${DB_PASSWORD:-tasks_dev_password}
+      DB_SSL: ${DB_SSL:-false}
+      SQLITE_DATABASE: /app/data/tasks.sqlite
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - sqlite_data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - npm run migration:run:compiled && npm run start:prod
+    restart: unless-stopped
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-tasks}
+      POSTGRES_USER: ${DB_USER:-tasks}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-tasks_dev_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  sqlite_data:
