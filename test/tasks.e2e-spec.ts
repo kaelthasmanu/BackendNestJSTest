@@ -143,7 +143,8 @@ describe('Tasks API (e2e)', () => {
     expect(filtered.body.meta.total).toBe(2);
     expect(
       filtered.body.data.every(
-        (task: Task) => task.status === 'pendiente' && task.responsible === 'Sam',
+        (task: Task) =>
+          task.status === 'pendiente' && task.responsible === 'Sam',
       ),
     ).toBe(true);
 
@@ -185,10 +186,70 @@ describe('Tasks API (e2e)', () => {
   });
 
   it('serves the OpenAPI document', async () => {
-    const response = await request(app.getHttpServer()).get('/docs-json').expect(200);
+    const response = await request(app.getHttpServer())
+      .get('/docs-json')
+      .expect(200);
+    const specification = response.body;
 
-    expect(response.body.paths).toHaveProperty('/tasks');
-    expect(response.body.paths).toHaveProperty('/tasks/{id}');
+    expect(specification.paths).toHaveProperty('/tasks');
+    expect(specification.paths).toHaveProperty('/tasks/{id}');
+    const createRequest =
+      specification.paths['/tasks'].post.requestBody.content['application/json']
+        .schema;
+    expect(createRequest).toMatchObject({
+      type: 'object',
+      additionalProperties: false,
+      required: ['title', 'description', 'responsible', 'dueDate'],
+    });
+    expect(createRequest.properties).toHaveProperty('title');
+    expect(createRequest.properties).toHaveProperty('status');
+    expect(
+      specification.paths['/tasks'].post.responses['201'].content[
+        'application/json'
+      ].schema.$ref,
+    ).toBe('#/components/schemas/TaskResponseDto');
+    expect(
+      specification.paths['/tasks'].get.parameters.map(
+        (parameter: { name: string }) => parameter.name,
+      ),
+    ).toEqual(['status', 'responsible', 'page', 'limit']);
+    expect(
+      specification.paths['/tasks'].get.responses['200'].content[
+        'application/json'
+      ].schema.$ref,
+    ).toBe('#/components/schemas/TaskListResponseDto');
+    expect(
+      specification.paths['/tasks'].get.parameters[2].schema,
+    ).toMatchObject({
+      type: 'integer',
+      minimum: 1,
+      maximum: 1_000_000,
+      default: 1,
+    });
+    const updateRequest =
+      specification.paths['/tasks/{id}'].patch.requestBody.content[
+        'application/json'
+      ].schema;
+    expect(updateRequest).toMatchObject({
+      type: 'object',
+      additionalProperties: false,
+    });
+    expect(updateRequest.required).toBeUndefined();
+    expect(updateRequest.properties).toHaveProperty('status');
+    expect(specification.paths['/tasks/{id}'].patch.description).toContain(
+      'al menos un campo',
+    );
+    expect(
+      specification.components.schemas.TaskResponseDto.properties,
+    ).toHaveProperty('createdAt');
+    expect(
+      specification.components.schemas.TaskResponseDto.properties,
+    ).toHaveProperty('updatedAt');
+    expect(specification.components.schemas.TaskStatus.enum).toEqual([
+      'pendiente',
+      'en curso',
+      'hecha',
+    ]);
   });
 
   it('updates and deletes a task', async () => {
@@ -284,7 +345,10 @@ describe('Tasks API (e2e)', () => {
       await request(app.getHttpServer()).get(`/tasks/${id}`).expect(400);
     }
 
-    await request(app.getHttpServer()).patch('/tasks/999999').send({ title: 'Valid title' }).expect(404);
+    await request(app.getHttpServer())
+      .patch('/tasks/999999')
+      .send({ title: 'Valid title' })
+      .expect(404);
     await request(app.getHttpServer()).delete('/tasks/999999').expect(404);
   });
 });
