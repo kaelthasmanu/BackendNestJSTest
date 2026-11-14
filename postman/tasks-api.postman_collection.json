@@ -1,0 +1,311 @@
+{
+  "info": {
+    "_postman_id": "3c2a789b-3df0-4cc7-92d4-8e7ae65d4c30",
+    "name": "Tasks API",
+    "description": "CRUD, filtros, paginación y validación de la API de tareas. Las pruebas guardan el ID creado para reutilizarlo en las siguientes solicitudes.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Crear tarea",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 201 Created', function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "const task = pm.response.json();",
+              "pm.test('Crea la tarea con estado pendiente por defecto', function () {",
+              "  pm.expect(task.id).to.be.a('number');",
+              "  pm.expect(task.status).to.eql('pendiente');",
+              "  pm.expect(task.title).to.eql('Tarea creada desde Postman');",
+              "});",
+              "pm.collectionVariables.set('taskId', String(task.id));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Tarea creada desde Postman\",\n  \"description\": \"Probar el flujo completo de la API\",\n  \"responsible\": \"Postman QA\",\n  \"dueDate\": \"2030-01-15\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/tasks"
+      }
+    },
+    {
+      "name": "Consultar tarea creada",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 200 OK', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Devuelve la tarea creada', function () {",
+              "  const task = pm.response.json();",
+              "  pm.expect(String(task.id)).to.eql(pm.collectionVariables.get('taskId'));",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/tasks/{{taskId}}"
+      }
+    },
+    {
+      "name": "Listar tareas con paginación",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 200 OK', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Devuelve datos y metadatos de paginación', function () {",
+              "  const result = pm.response.json();",
+              "  pm.expect(result.data).to.be.an('array');",
+              "  pm.expect(result.meta.page).to.eql(1);",
+              "  pm.expect(result.meta.limit).to.eql(10);",
+              "  pm.expect(result.meta.total).to.be.a('number');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/tasks?page=1&limit=10"
+      }
+    },
+    {
+      "name": "Filtrar por estado y responsable",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 200 OK', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Incluye la tarea filtrada', function () {",
+              "  const result = pm.response.json();",
+              "  const taskId = pm.collectionVariables.get('taskId');",
+              "  pm.expect(result.data.some((task) => String(task.id) === taskId)).to.eql(true);",
+              "  pm.expect(result.data.every((task) => task.status === 'pendiente')).to.eql(true);",
+              "  pm.expect(result.data.every((task) => task.responsible === 'Postman QA')).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/tasks?status=pendiente&responsible=Postman%20QA&page=1&limit=10"
+      }
+    },
+    {
+      "name": "Actualizar tarea",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 200 OK y cambia el estado', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().status).to.eql('en curso');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"en curso\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/tasks/{{taskId}}"
+      }
+    },
+    {
+      "name": "Filtrar tareas en curso",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 200 OK y encuentra la tarea actualizada', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const result = pm.response.json();",
+              "  const taskId = pm.collectionVariables.get('taskId');",
+              "  pm.expect(result.data.some((task) => String(task.id) === taskId)).to.eql(true);",
+              "  pm.expect(result.data.every((task) => task.status === 'en curso')).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/tasks?status=en%20curso&responsible=Postman%20QA&page=1&limit=10"
+      }
+    },
+    {
+      "name": "Rechazar datos inválidos",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 400 Bad Request', function () {",
+              "  pm.response.to.have.status(400);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"\",\n  \"description\": \"Fecha inválida\",\n  \"responsible\": \"Postman QA\",\n  \"dueDate\": \"2026-02-30\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/tasks"
+      }
+    },
+    {
+      "name": "Consultar ID inexistente",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set('missingTaskId', String(Date.now()));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 404 Not Found', function () {",
+              "  pm.response.to.have.status(404);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/tasks/{{missingTaskId}}"
+      }
+    },
+    {
+      "name": "Eliminar tarea",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 204 No Content', function () {",
+              "  pm.response.to.have.status(204);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/tasks/{{taskId}}"
+      }
+    },
+    {
+      "name": "Confirmar tarea eliminada",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 404 después de eliminar', function () {",
+              "  pm.response.to.have.status(404);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/tasks/{{taskId}}"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "taskId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "missingTaskId",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
