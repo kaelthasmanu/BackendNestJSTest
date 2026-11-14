@@ -259,3 +259,7 @@ Las propuestas de la IA se contrastaron con el código existente, los tipos de l
 - Incorporar autenticación y autorización; si las tareas pertenecen a usuarios, asociarlas mediante un identificador en lugar de tratar `responsible` solo como texto.
 - Añadir controles de concurrencia para evitar que una actualización sobrescriba silenciosamente cambios recientes.
 - Incorporar métricas, trazas y verificaciones de salud para facilitar la operación y el diagnóstico en producción.
+
+## Tiempo dedicado
+
+Tiempo total para completar la prueba técnica: **2 horas y 50 minutos**.
