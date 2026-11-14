@@ -3,6 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { Repository } from 'typeorm';
 import { AppModule } from './../src/app.module.js';
+import { setupApp } from './../src/app-setup.js';
 import { Task } from './../src/tasks/task.entity.js';
 import { TASKS_REPOSITORY } from '../src/tasks/constants/tasks.constants.js';
 
@@ -16,6 +17,7 @@ describe('Tasks API (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    setupApp(app);
     await app.init();
     repository = app.get(TASKS_REPOSITORY);
   });
@@ -84,6 +86,100 @@ describe('Tasks API (e2e)', () => {
     });
   });
 
+  it('paginates in stable order, filters results, and handles pages beyond the result set', async () => {
+    const createdIds: number[] = [];
+
+    for (let index = 0; index < 13; index += 1) {
+      const response = await request(app.getHttpServer())
+        .post('/tasks')
+        .send({
+          title: `Task ${index}`,
+          description: `Description ${index}`,
+          responsible: index % 2 === 0 ? 'Alex' : 'Sam',
+          dueDate: '2026-12-01',
+          status: index % 3 === 0 ? 'pendiente' : 'en curso',
+        })
+        .expect(201);
+      createdIds.push(response.body.id);
+    }
+
+    const firstPage = await request(app.getHttpServer())
+      .get('/tasks?page=1&limit=5')
+      .expect(200);
+    const firstPageAgain = await request(app.getHttpServer())
+      .get('/tasks?page=1&limit=5')
+      .expect(200);
+    const secondPage = await request(app.getHttpServer())
+      .get('/tasks?page=2&limit=5')
+      .expect(200);
+    const lastPage = await request(app.getHttpServer())
+      .get('/tasks?page=3&limit=5')
+      .expect(200);
+
+    expect(firstPage.body.meta).toEqual({
+      page: 1,
+      limit: 5,
+      total: 13,
+      totalPages: 3,
+    });
+    expect(firstPage.body.data.map((task: Task) => task.id)).toEqual(
+      firstPageAgain.body.data.map((task: Task) => task.id),
+    );
+    expect(firstPage.body.data).toHaveLength(5);
+    expect(secondPage.body.data).toHaveLength(5);
+    expect(lastPage.body.data).toHaveLength(3);
+
+    const allPageIds = [
+      ...firstPage.body.data,
+      ...secondPage.body.data,
+      ...lastPage.body.data,
+    ].map((task: Task) => task.id);
+    expect(new Set(allPageIds).size).toBe(13);
+    expect(allPageIds).toEqual([...createdIds].reverse());
+
+    const filtered = await request(app.getHttpServer())
+      .get('/tasks?status=pendiente&responsible=Sam&page=1&limit=5')
+      .expect(200);
+    expect(filtered.body.meta.total).toBe(2);
+    expect(
+      filtered.body.data.every(
+        (task: Task) => task.status === 'pendiente' && task.responsible === 'Sam',
+      ),
+    ).toBe(true);
+
+    const outOfRange = await request(app.getHttpServer())
+      .get('/tasks?page=99&limit=5')
+      .expect(200);
+    expect(outOfRange.body.data).toEqual([]);
+    expect(outOfRange.body.meta).toEqual({
+      page: 99,
+      limit: 5,
+      total: 13,
+      totalPages: 3,
+    });
+  });
+
+  it('rejects invalid filters, pagination, duplicate parameters, and unknown query fields', async () => {
+    const invalidQueries = [
+      '/tasks?page=0',
+      '/tasks?page=1.5',
+      '/tasks?page=1e2',
+      '/tasks?page=1000001',
+      '/tasks?limit=0',
+      '/tasks?limit=101',
+      '/tasks?limit=abc',
+      '/tasks?status=unknown',
+      '/tasks?responsible=%20',
+      `/tasks?responsible=${'x'.repeat(121)}`,
+      '/tasks?page=1&page=2',
+      '/tasks?extra=true',
+    ];
+
+    for (const path of invalidQueries) {
+      await request(app.getHttpServer()).get(path).expect(400);
+    }
+  });
+
   it('returns 404 for an unknown task', async () => {
     await request(app.getHttpServer()).get('/tasks/999').expect(404);
   });
@@ -119,5 +215,76 @@ describe('Tasks API (e2e)', () => {
     await request(app.getHttpServer())
       .get(`/tasks/${created.body.id}`)
       .expect(404);
+  });
+
+  it('normalizes task fields, preserves omitted fields in PATCH, and rejects invalid writes atomically', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/tasks')
+      .send({
+        title: '  Original title  ',
+        description: '  Original description  ',
+        responsible: '  Alex  ',
+        dueDate: '2026-12-01',
+      })
+      .expect(201);
+
+    expect(created.body).toMatchObject({
+      title: 'Original title',
+      description: 'Original description',
+      responsible: 'Alex',
+      status: 'pendiente',
+    });
+
+    const invalidBodies = [
+      {},
+      { title: null },
+      { title: '  ' },
+      { title: 'Must not be persisted', status: 'invalid' },
+      { description: 'x'.repeat(5001) },
+      { responsible: 'x'.repeat(121) },
+      { dueDate: '2026-02-30' },
+      { extra: true },
+    ];
+    for (const body of invalidBodies) {
+      await request(app.getHttpServer())
+        .patch(`/tasks/${created.body.id}`)
+        .send(body)
+        .expect(400);
+    }
+
+    const unchanged = await request(app.getHttpServer())
+      .get(`/tasks/${created.body.id}`)
+      .expect(200);
+    expect(unchanged.body).toMatchObject({
+      title: 'Original title',
+      description: 'Original description',
+      responsible: 'Alex',
+      dueDate: '2026-12-01',
+      status: 'pendiente',
+      createdAt: created.body.createdAt,
+    });
+
+    const updated = await request(app.getHttpServer())
+      .patch(`/tasks/${created.body.id}`)
+      .send({ title: 'Updated title' })
+      .expect(200);
+    expect(updated.body).toMatchObject({
+      title: 'Updated title',
+      description: 'Original description',
+      responsible: 'Alex',
+      dueDate: '2026-12-01',
+      status: 'pendiente',
+      createdAt: created.body.createdAt,
+    });
+    expect(updated.body.updatedAt >= created.body.updatedAt).toBe(true);
+  });
+
+  it('distinguishes malformed task IDs from missing tasks', async () => {
+    for (const id of ['0', 'abc', '1.5']) {
+      await request(app.getHttpServer()).get(`/tasks/${id}`).expect(400);
+    }
+
+    await request(app.getHttpServer()).patch('/tasks/999999').send({ title: 'Valid title' }).expect(404);
+    await request(app.getHttpServer()).delete('/tasks/999999').expect(404);
   });
 });
