@@ -88,6 +88,13 @@ describe('Tasks API (e2e)', () => {
     await request(app.getHttpServer()).get('/tasks/999').expect(404);
   });
 
+  it('serves the OpenAPI document', async () => {
+    const response = await request(app.getHttpServer()).get('/docs-json').expect(200);
+
+    expect(response.body.paths).toHaveProperty('/tasks');
+    expect(response.body.paths).toHaveProperty('/tasks/{id}');
+  });
+
   it('updates and deletes a task', async () => {
     const created = await request(app.getHttpServer())
       .post('/tasks')
